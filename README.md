@@ -1,38 +1,76 @@
 # 🎰 Mines Signal Bot
 
-Professional Telegram bot — Mines o'yini uchun signal beruvchi bot.
+Professional Telegram bot — Mines o'yini uchun signal beruvchi bot.  
+**Render.com** da deploy qilish uchun tayyor.
 
 ---
 
-## 📦 O'rnatish
+## 📦 O'rnatish (Local)
 
 ```bash
-cd mines-bot
 npm install
 cp .env.example .env
+# .env faylini tahrirlang
+npm run dev
 ```
-
-`.env` faylini tahrirlang:
-
-```
-BOT_TOKEN=BotFather dan olgan tokeningiz
-ADMIN_IDS=Telegram ID raqamingiz
-ADMIN_USERNAME=telegram_username
-```
-
-> 💡 Telegram ID ni bilish uchun @userinfobot ga yozing
 
 ---
 
-## 🚀 Ishga tushirish
+## 🚀 Render.com ga Deploy qilish
 
+### 1. GitHub ga yuklash
 ```bash
-npm start
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/sizning-username/mines-bot.git
+git push -u origin main
 ```
 
-Yoki dev rejimida (auto-restart):
-```bash
-npm run dev
+### 2. Render.com da yangi Web Service yaratish
+- render.com ga kiring → **New → Web Service**
+- GitHub repo ni ulang
+- Quyidagi sozlamalarni kiriting:
+
+| Sozlama | Qiymat |
+|---------|--------|
+| **Runtime** | Node |
+| **Build Command** | `npm install` |
+| **Start Command** | `npm start` |
+| **Plan** | Free |
+
+### 3. Environment Variables qo'shish
+Render dashboard → **Environment** bo'limiga kiring:
+
+```
+BOT_TOKEN          = BotFather dan olgan token
+ADMIN_IDS          = 123456789
+ADMIN_USERNAME     = sizning_username
+WEBHOOK_DOMAIN     = https://your-app.onrender.com   ← Render beradi
+CARD_NUMBER        = 8600 0000 0000 0000
+CARD_OWNER         = Ism Familiya
+```
+
+> ⚠️ `WEBHOOK_DOMAIN` ni Render bergan URL bilan to'ldiring.  
+> URL formatı: `https://your-app-name.onrender.com`
+
+### 4. Deploy
+**Create Web Service** tugmasini bosing. Bot avtomatik ishga tushadi!
+
+---
+
+## 🗂️ Fayl tuzilmasi
+
+```
+mines-bot/
+├── index.js        — Asosiy bot + Express webhook server
+├── database.js     — JSON bazasi
+├── signal.js       — Signal generatori
+├── subscription.js — Obuna tekshirish
+├── admin.js        — Admin panel
+├── package.json
+├── .env.example    — Sozlamalar namunasi
+└── data.json       — Ma'lumotlar (avtomatik yaratiladi)
 ```
 
 ---
@@ -40,10 +78,12 @@ npm run dev
 ## ✨ Imkoniyatlar
 
 ### 👤 Foydalanuvchi
-- `/start` — Botni boshlash
-- 🎯 **Signal olish** — 5x5 jadvaldan hujayralar tanlash va signal olish
-- 💳 **Obuna sotib olish** — Tarif tanlash va to'lov
-- 👤 **Mening profilim** — Obuna holati va statistika
+| Tugma | Vazifa |
+|-------|--------|
+| 🎯 Signal olish | 5x5 jadvaldan hujayralar tanlash |
+| 💳 Obuna sotib olish | Tarif tanlash va to'lov |
+| 👤 Mening profilim | Obuna holati va statistika |
+| 📊 Statistika | Bot umumiy statistikasi |
 
 ### 💳 Tariflar
 | Tarif | Narx | Muddat |
@@ -53,35 +93,19 @@ npm run dev
 
 ### 👨‍💼 Admin Panel (`/admin`)
 - 👥 Foydalanuvchilar ro'yxati
-- 💳 To'lovlarni ko'rish va tasdiqlash/rad etish
+- 💳 To'lovlar — tasdiqlash / rad etish
 - ✅ Faol obunalar
-- 📊 To'liq statistika (daromad, signallar)
+- 📊 To'liq statistika + daromad
 - 📣 Broadcast — barcha foydalanuvchilarga xabar
-- 👮 Admin qo'shish/o'chirish
+- 👮 Admin qo'shish / o'chirish
 - 🎯 Qo'lda obuna berish
 
 ### ⚡ Admin buyruqlari
 ```
-/admin           — Admin panelni ochish
-/addadmin <id>   — Admin qo'shish
-/removeadmin <id>— Admin o'chirish
-/givesub <id> <1|3> — Qo'lda obuna berish
-```
-
----
-
-## 🗂️ Fayl tuzilmasi
-
-```
-mines-bot/
-├── index.js        — Asosiy bot
-├── database.js     — Ma'lumotlar bazasi (JSON)
-├── signal.js       — Signal generatori
-├── subscription.js — Obuna tekshirish
-├── admin.js        — Admin panel
-├── data.json       — Ma'lumotlar (avtomatik yaratiladi)
-├── package.json
-└── .env
+/admin                   — Admin panelni ochish
+/addadmin <id>           — Admin qo'shish
+/removeadmin <id>        — Admin o'chirish
+/givesub <id> <1|3>      — Qo'lda obuna berish
 ```
 
 ---
@@ -91,20 +115,20 @@ mines-bot/
 ```
 Foydalanuvchi tarif tanlaydi
         ↓
-To'lov ma'lumotlari ko'rsatiladi
+Karta ma'lumotlari ko'rsatiladi
         ↓
 Foydalanuvchi chek rasmini yuboradi
         ↓
-Admin xabar oladi (Tasdiqlash/Rad etish)
+Admin Tasdiqlash / Rad etish tugmasini bosadi
         ↓
-Admin tasdiqlasa → Obuna faollashadi
-Foydalanuvchiga xabar ketadi ✅
+Obuna avtomatik faollashadi ✅
+Foydalanuvchiga xabar ketadi
 ```
 
 ---
 
-## 📝 Eslatmalar
+## ℹ️ Eslatmalar
 
-- `data.json` fayli avtomatik yaratiladi
-- Bot to'xtatilsa, ma'lumotlar saqlanib qoladi
-- Katta hajmda foydalanuvchi uchun SQLite yoki PostgreSQL ga o'tish tavsiya etiladi
+- `data.json` avtomatik yaratiladi
+- Render free plan — 15 daqiqa faoliyat bo'lmasa server "uxlaydi", birinchi so'rovda ~30s kechikadi
+- Ko'p foydalanuvchi uchun SQLite yoki PostgreSQL tavsiya etiladi
