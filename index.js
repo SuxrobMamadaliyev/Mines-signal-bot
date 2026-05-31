@@ -1,8 +1,9 @@
 require('dotenv').config();
 const { Telegraf, Markup, session } = require('telegraf');
+const express = require('express');
 const db = require('./database');
 const { generateSignal } = require('./signal');
-const { isSubscribed, getSubscription } = require('./subscription');
+const { getSubscription } = require('./subscription');
 const adminPanel = require('./admin');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -22,16 +23,14 @@ bot.start(async (ctx) => {
   const sub = await getSubscription(user.id);
   const isActive = sub && new Date(sub.expires_at) > new Date();
 
-  await ctx.replyWithPhoto(
-    { url: 'https://i.imgur.com/mines_banner.png' },
+  await ctx.reply(
+    `🎰 *MINES SIGNAL BOT*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Salom, *${user.first_name}*! 👋\n\n` +
+    `Bu bot sizga Mines o'yinida yuqori aniqlikdagi signallar beradi.\n\n` +
+    `${isActive ? '✅ *Obunangiz faol!*' : '❌ *Obunangiz yo\'q*'}\n\n` +
+    `Pastdagi menyudan foydalaning 👇`,
     {
-      caption:
-        `🎰 *MINES SIGNAL BOT*\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `Salom, *${user.first_name}*! 👋\n\n` +
-        `Bu bot sizga Mines o'yinida yuqori aniqlikdagi signallar beradi.\n\n` +
-        `${isActive ? '✅ *Obunangiz faol!*' : '❌ *Obunangiz yo'q*'}\n\n` +
-        `Pastdagi menyudan foydalaning 👇`,
       parse_mode: 'Markdown',
       ...Markup.keyboard([
         ['🎯 Signal olish', '💳 Obuna sotib olish'],
@@ -39,24 +38,7 @@ bot.start(async (ctx) => {
         ['ℹ️ Yordam', '📞 Bog\'lanish'],
       ]).resize(),
     }
-  ).catch(() => {
-    ctx.reply(
-      `🎰 *MINES SIGNAL BOT*\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `Salom, *${user.first_name}*! 👋\n\n` +
-      `Bu bot sizga Mines o'yinida yuqori aniqlikdagi signallar beradi.\n\n` +
-      `${isActive ? '✅ *Obunangiz faol!*' : '❌ *Obunangiz yo\'q*'}\n\n` +
-      `Pastdagi menyudan foydalaning 👇`,
-      {
-        parse_mode: 'Markdown',
-        ...Markup.keyboard([
-          ['🎯 Signal olish', '💳 Obuna sotib olish'],
-          ['👤 Mening profilim', '📊 Statistika'],
-          ['ℹ️ Yordam', '📞 Bog\'lanish'],
-        ]).resize(),
-      }
-    );
-  });
+  );
 });
 
 // ─── SIGNAL ──────────────────────────────────────────────────────────────────
@@ -78,21 +60,19 @@ bot.hears('🎯 Signal olish', async (ctx) => {
     );
   }
 
-  // Show 5x5 grid to select cells
   ctx.session = ctx.session || {};
   ctx.session.selected = [];
-  ctx.session.signalStep = 'selecting';
 
   await ctx.reply(
     `🎯 *SIGNAL OLISH*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
     `Quyidagi 5x5 jadvaldan hujayralarni tanlang.\n` +
     `Bot sizga qaysi hujayra xavfsizligini aniqlaydi.\n\n` +
-    `✅ - Tanlangan\n⬜ - Tanlanmagan\n\n` +
-    `Kamida 1 ta hujayra tanlang, keyin *"Tahlil qil"* tugmasini bosing.`,
+    `✅ — Tanlangan  |  ⬜ — Tanlanmagan\n\n` +
+    `Kamida 1 ta hujayra tanlang, keyin *Tahlil qil* tugmasini bosing.`,
     {
       parse_mode: 'Markdown',
-      ...buildGrid(ctx.session.selected),
+      ...buildGrid([]),
     }
   );
 });
@@ -115,7 +95,6 @@ function buildGrid(selected = []) {
   return Markup.inlineKeyboard(rows);
 }
 
-// Cell toggle
 bot.action(/^cell_(\d+)$/, async (ctx) => {
   ctx.session = ctx.session || {};
   ctx.session.selected = ctx.session.selected || [];
@@ -136,6 +115,7 @@ bot.action(/^cell_(\d+)$/, async (ctx) => {
 });
 
 bot.action('clear_grid', async (ctx) => {
+  ctx.session = ctx.session || {};
   ctx.session.selected = [];
   await ctx.editMessageReplyMarkup(buildGrid([]).reply_markup);
   await ctx.answerCbQuery('🔄 Tozalandi');
@@ -154,8 +134,7 @@ bot.action('analyze_grid', async (ctx) => {
     parse_mode: 'Markdown',
   });
 
-  // Simulate analysis delay
-  await new Promise((r) => setTimeout(r, 2000));
+  await new Promise((r) => setTimeout(r, 1500));
 
   const signal = generateSignal(selected);
   await db.logSignal(ctx.from.id, selected, signal);
@@ -165,14 +144,13 @@ bot.action('analyze_grid', async (ctx) => {
   await ctx.editMessageText(
     `🎯 *MINES SIGNAL NATIJASI*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `📊 Tahlil tugadi!\n\n` +
-    `${gridDisplay}\n\n` +
-    `💎 *Xavfsiz hujayralar:* ${signal.safe.map((i) => i + 1).join(', ')}\n` +
-    `💣 *Xavfli hujayralar:* ${signal.danger.map((i) => i + 1).join(', ')}\n\n` +
+    `${gridDisplay}\n` +
+    `💎 *Xavfsiz:* ${signal.safe.map((i) => i + 1).join(', ')}\n` +
+    `💣 *Xavfli:* ${signal.danger.map((i) => i + 1).join(', ')}\n\n` +
     `🎯 *Aniqlik:* ${signal.accuracy}%\n` +
     `⚡ *Signal kuchi:* ${signal.strength}\n\n` +
-    `⏰ Signal vaqti: ${new Date().toLocaleTimeString('uz-UZ')}\n\n` +
-    `⚠️ _Eslatma: Bu signal ma'lumot uchun, mas'uliyat o'zingizda!_`,
+    `⏰ ${new Date().toLocaleTimeString('uz-UZ')}\n\n` +
+    `⚠️ _Eslatma: Mas'uliyat o'zingizda!_`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -183,15 +161,13 @@ bot.action('analyze_grid', async (ctx) => {
 });
 
 bot.action('new_signal', async (ctx) => {
+  ctx.session = ctx.session || {};
   ctx.session.selected = [];
   await ctx.editMessageText(
     `🎯 *SIGNAL OLISH*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
     `Hujayralarni tanlang va tahlil qiling 👇`,
-    {
-      parse_mode: 'Markdown',
-      ...buildGrid([]),
-    }
+    { parse_mode: 'Markdown', ...buildGrid([]) }
   );
   await ctx.answerCbQuery();
 });
@@ -224,9 +200,9 @@ async function showSubscriptionPlans(ctx) {
   const sub = await getSubscription(ctx.from.id);
   const isActive = sub && new Date(sub.expires_at) > new Date();
 
-  let subStatus = isActive
-    ? `✅ *Joriy obunangiz:* ${sub.plan_name}\n📅 *Tugash sanasi:* ${new Date(sub.expires_at).toLocaleDateString('uz-UZ')}\n\n`
-    : `❌ *Obunangiz yo'q*\n\n`;
+  const subStatus = isActive
+    ? `✅ *Joriy obunangiz:* ${sub.plan_name}\n📅 *Tugash:* ${new Date(sub.expires_at).toLocaleDateString('uz-UZ')}\n\n`
+    : `❌ *Obunangiz yo\u2019q*\n\n`;
 
   await ctx.reply(
     `💳 *OBUNA TARIFLARI*\n` +
@@ -243,8 +219,8 @@ async function showSubscriptionPlans(ctx) {
     `├ 5x5 jadval\n` +
     `├ VIP signal kanalga kirish\n` +
     `└ 24/7 qo'llab-quvvatlash\n\n` +
-    `💰 To'lov usullari: Click, Payme, Uzcard\n\n` +
-    `To'lovni amalga oshirish uchun tarifni tanlang 👇`,
+    `💰 To'lov: Click, Payme, Uzcard\n\n` +
+    `Tarifni tanlang 👇`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -259,12 +235,13 @@ bot.action(/^plan_(1month|3month)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const plan = ctx.match[1];
   const planData = {
-    '1month': { name: '1 Oylik', price: 30000, months: 1 },
-    '3month': { name: '3 Oylik', price: 90000, months: 3 },
+    '1month': { name: '1 Oylik', price: 30000 },
+    '3month': { name: '3 Oylik', price: 90000 },
   }[plan];
 
-  // Create pending payment request
   const paymentId = await db.createPaymentRequest(ctx.from.id, plan, planData.price);
+  const cardNumber = process.env.CARD_NUMBER || '8600 0000 0000 0000';
+  const cardOwner = process.env.CARD_OWNER || 'Mines Signal Bot';
 
   await ctx.reply(
     `💳 *TO'LOV MA'LUMOTLARI*\n` +
@@ -272,13 +249,11 @@ bot.action(/^plan_(1month|3month)$/, async (ctx) => {
     `📦 Tarif: *${planData.name}*\n` +
     `💰 Summa: *${planData.price.toLocaleString()} UZS*\n` +
     `🆔 To'lov ID: \`${paymentId}\`\n\n` +
-    `📱 *To'lov usullari:*\n\n` +
-    `💳 *Click / Payme:*\n` +
-    `┌ Karta: \`8600 1234 5678 9012\`\n` +
-    `└ Egasi: Mines Signal Bot\n\n` +
-    `✅ To'lovni amalga oshirgandan so'ng\n` +
-    `chek rasmini yuboring.\n\n` +
-    `⏰ So'rov 24 soat ichida ko'rib chiqiladi.`,
+    `💳 *Karta:*\n` +
+    `┌ Raqam: \`${cardNumber}\`\n` +
+    `└ Egasi: ${cardOwner}\n\n` +
+    `✅ To'lovdan so'ng chek rasmini yuboring.\n` +
+    `⏰ Ko'rib chiqish vaqti: 1–24 soat`,
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -297,7 +272,7 @@ bot.action(/^send_receipt_(.+)$/, async (ctx) => {
 
   await ctx.reply(
     `📸 *Chek rasmini yuboring*\n\n` +
-    `To'lov cheki rasmini yoki screenshot'ini yuboring.\n` +
+    `To'lov cheki yoki screenshot rasmini yuboring.\n` +
     `Admin ko'rib chiqadi va obuna faollashtiriladi.`,
     { parse_mode: 'Markdown' }
   );
@@ -308,64 +283,60 @@ bot.action('cancel_payment', async (ctx) => {
   await ctx.deleteMessage();
 });
 
-// Handle receipt photo
+// ─── RECEIPT PHOTO ────────────────────────────────────────────────────────────
 bot.on('photo', async (ctx) => {
   ctx.session = ctx.session || {};
-  if (ctx.session.awaitingReceipt) {
-    const paymentId = ctx.session.awaitingReceipt;
-    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+  if (!ctx.session.awaitingReceipt) return;
 
-    await db.updatePaymentReceipt(paymentId, fileId, ctx.from.id);
+  const paymentId = ctx.session.awaitingReceipt;
+  const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
 
-    // Notify admins
-    const admins = await db.getAdmins();
-    for (const admin of admins) {
-      try {
-        await bot.telegram.sendPhoto(admin.user_id, fileId, {
-          caption:
-            `🔔 *YANGI TO'LOV SO'ROVI*\n\n` +
-            `👤 Foydalanuvchi: ${ctx.from.first_name} (@${ctx.from.username || 'noma\'lum'})\n` +
-            `🆔 ID: ${ctx.from.id}\n` +
-            `🧾 To'lov ID: \`${paymentId}\``,
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [
-              Markup.button.callback('✅ Tasdiqlash', `approve_${paymentId}`),
-              Markup.button.callback('❌ Rad etish', `reject_${paymentId}`),
-            ],
-          ]),
-        });
-      } catch (e) {}
-    }
+  await db.updatePaymentReceipt(paymentId, fileId, ctx.from.id);
 
-    ctx.session.awaitingReceipt = null;
-    await ctx.reply(
-      `✅ *Chek yuborildi!*\n\n` +
-      `To'lovingiz ko'rib chiqilmoqda.\n` +
-      `Tasdiqlangandan so'ng sizga xabar beriladi.\n\n` +
-      `⏰ Ko'rib chiqish vaqti: 1–24 soat`,
-      { parse_mode: 'Markdown' }
-    );
+  const admins = await db.getAdmins();
+  for (const admin of admins) {
+    try {
+      await bot.telegram.sendPhoto(admin.user_id, fileId, {
+        caption:
+          `🔔 *YANGI TO'LOV SO'ROVI*\n\n` +
+          `👤 ${ctx.from.first_name} (@${ctx.from.username || 'noma\'lum'})\n` +
+          `🆔 ID: \`${ctx.from.id}\`\n` +
+          `🧾 To'lov ID: \`${paymentId}\``,
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('✅ Tasdiqlash', `approve_${paymentId}`),
+            Markup.button.callback('❌ Rad etish', `reject_${paymentId}`),
+          ],
+        ]),
+      });
+    } catch (e) {}
   }
+
+  ctx.session.awaitingReceipt = null;
+  await ctx.reply(
+    `✅ *Chek yuborildi!*\n\n` +
+    `To'lovingiz ko'rib chiqilmoqda.\n` +
+    `Tasdiqlangandan so'ng xabar beriladi.\n\n` +
+    `⏰ Ko'rib chiqish: 1–24 soat`,
+    { parse_mode: 'Markdown' }
+  );
 });
 
-// Admin approve/reject
+// ─── APPROVE / REJECT ─────────────────────────────────────────────────────────
 bot.action(/^approve_(.+)$/, async (ctx) => {
-  const adminId = ctx.from.id;
-  const isAdmin = await db.isAdmin(adminId);
-  if (!isAdmin) return ctx.answerCbQuery('⛔ Ruxsat yo\'q');
-
+  if (!(await db.isAdmin(ctx.from.id))) return ctx.answerCbQuery('⛔ Ruxsat yo\'q');
   const paymentId = ctx.match[1];
   const payment = await db.getPayment(paymentId);
   if (!payment) return ctx.answerCbQuery('❌ To\'lov topilmadi');
 
   const months = payment.plan === '1month' ? 1 : 3;
   const planName = payment.plan === '1month' ? '1 Oylik' : '3 Oylik';
-  await db.activateSubscription(payment.user_id, months, planName, paymentId, adminId);
+  await db.activateSubscription(payment.user_id, months, planName, paymentId, ctx.from.id);
 
   await ctx.answerCbQuery('✅ Tasdiqlandi!');
   await ctx.editMessageCaption(
-    (ctx.callbackQuery.message.caption || '') + `\n\n✅ *TASDIQLANDI* — Admin: ${ctx.from.first_name}`,
+    (ctx.callbackQuery.message.caption || '') + `\n\n✅ TASDIQLANDI — ${ctx.from.first_name}`,
     { parse_mode: 'Markdown' }
   );
 
@@ -374,36 +345,30 @@ bot.action(/^approve_(.+)$/, async (ctx) => {
       payment.user_id,
       `🎉 *OBUNANGIZ FAOLLASHTIRILDI!*\n\n` +
       `📦 Tarif: *${planName}*\n` +
-      `📅 Muddat: *${months} oy*\n` +
-      `⏰ Tugash sanasi: *${new Date(Date.now() + months * 30 * 24 * 3600 * 1000).toLocaleDateString('uz-UZ')}*\n\n` +
-      `Endi signallardan foydalanishingiz mumkin! 🎯`,
+      `⏰ Tugash: *${new Date(Date.now() + months * 30 * 24 * 3600 * 1000).toLocaleDateString('uz-UZ')}*\n\n` +
+      `Endi signallardan foydalaning! 🎯`,
       { parse_mode: 'Markdown' }
     );
   } catch (e) {}
 });
 
 bot.action(/^reject_(.+)$/, async (ctx) => {
-  const adminId = ctx.from.id;
-  const isAdmin = await db.isAdmin(adminId);
-  if (!isAdmin) return ctx.answerCbQuery('⛔ Ruxsat yo\'q');
-
+  if (!(await db.isAdmin(ctx.from.id))) return ctx.answerCbQuery('⛔ Ruxsat yo\'q');
   const paymentId = ctx.match[1];
   const payment = await db.getPayment(paymentId);
   if (!payment) return ctx.answerCbQuery('❌ To\'lov topilmadi');
 
-  await db.rejectPayment(paymentId, adminId);
+  await db.rejectPayment(paymentId, ctx.from.id);
   await ctx.answerCbQuery('❌ Rad etildi');
   await ctx.editMessageCaption(
-    (ctx.callbackQuery.message.caption || '') + `\n\n❌ *RAD ETILDI* — Admin: ${ctx.from.first_name}`,
+    (ctx.callbackQuery.message.caption || '') + `\n\n❌ RAD ETILDI — ${ctx.from.first_name}`,
     { parse_mode: 'Markdown' }
   );
 
   try {
     await bot.telegram.sendMessage(
       payment.user_id,
-      `❌ *To'lovingiz rad etildi.*\n\n` +
-      `Muammo bo'lsa, admin bilan bog'laning.\n` +
-      `📞 @${process.env.ADMIN_USERNAME || 'admin'}`,
+      `❌ *To'lovingiz rad etildi.*\n\nAdmin bilan bog'laning: @${process.env.ADMIN_USERNAME || 'admin'}`,
       { parse_mode: 'Markdown' }
     );
   } catch (e) {}
@@ -415,7 +380,6 @@ bot.hears('👤 Mening profilim', async (ctx) => {
   const sub = await getSubscription(userId);
   const isActive = sub && new Date(sub.expires_at) > new Date();
   const stats = await db.getUserStats(userId);
-
   const daysLeft = isActive
     ? Math.ceil((new Date(sub.expires_at) - new Date()) / (1000 * 60 * 60 * 24))
     : 0;
@@ -429,46 +393,40 @@ bot.hears('👤 Mening profilim', async (ctx) => {
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `💳 *OBUNA HOLATI*\n` +
     `${isActive
-      ? `✅ Faol — ${sub.plan_name}\n📅 Qolgan kun: ${daysLeft} kun\n📆 Tugash: ${new Date(sub.expires_at).toLocaleDateString('uz-UZ')}`
-      : `❌ Obuna yo'q`}\n\n` +
+      ? `✅ Faol — ${sub.plan_name}\n📅 Qolgan: ${daysLeft} kun\n📆 Tugash: ${new Date(sub.expires_at).toLocaleDateString('uz-UZ')}`
+      : `❌ Obuna yo\u2019q`}\n\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `📊 *STATISTIKA*\n` +
     `🎯 Jami signal: ${stats.total_signals}\n` +
     `📅 Bugungi: ${stats.today_signals}\n` +
-    `📆 Ro'yxatdan o'tgan: ${new Date(stats.joined_at).toLocaleDateString('uz-UZ')}`,
+    `📆 Ro'yxatdan: ${new Date(stats.joined_at).toLocaleDateString('uz-UZ')}`,
     { parse_mode: 'Markdown' }
   );
 });
 
-// ─── STATS ───────────────────────────────────────────────────────────────────
 bot.hears('📊 Statistika', async (ctx) => {
   const stats = await db.getGlobalStats();
   await ctx.reply(
     `📊 *BOT STATISTIKASI*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `👥 Jami foydalanuvchilar: ${stats.total_users}\n` +
+    `👥 Foydalanuvchilar: ${stats.total_users}\n` +
     `✅ Faol obunalar: ${stats.active_subs}\n` +
     `🎯 Bugungi signallar: ${stats.today_signals}\n` +
-    `📡 Jami signallar: ${stats.total_signals}\n\n` +
-    `📅 So'ngi yangilanish: ${new Date().toLocaleTimeString('uz-UZ')}`,
+    `📡 Jami signallar: ${stats.total_signals}`,
     { parse_mode: 'Markdown' }
   );
 });
 
-// ─── HELP ────────────────────────────────────────────────────────────────────
 bot.hears('ℹ️ Yordam', async (ctx) => {
   await ctx.reply(
     `ℹ️ *YORDAM*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
     `🎯 *Signal olish:*\n` +
     `Obuna oling → 5x5 jadvaldan hujayralar tanlang → Signal oling\n\n` +
-    `💳 *Obuna:*\n` +
+    `💳 *Tariflar:*\n` +
     `• 1 Oylik: 30,000 UZS\n` +
     `• 3 Oylik: 90,000 UZS\n\n` +
-    `💡 *Signal nima?*\n` +
-    `Bot AI algoritm yordamida qaysi hujayralar xavfsiz ekanligini aniqlaydi.\n\n` +
-    `⚠️ *Mas'uliyat:*\n` +
-    `Bu bot faqat yordam berish maqsadida. Mas'uliyat foydalanuvchida.`,
+    `⚠️ Bu bot faqat yordam berish maqsadida. Mas'uliyat foydalanuvchida.`,
     { parse_mode: 'Markdown' }
   );
 });
@@ -478,25 +436,44 @@ bot.hears('📞 Bog\'lanish', async (ctx) => {
     `📞 *BOG'LANISH*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n` +
     `👨‍💼 Admin: @${process.env.ADMIN_USERNAME || 'admin'}\n` +
-    `⏰ Ish vaqti: 09:00 — 23:00\n\n` +
-    `📌 Muammo yoki savollar uchun adminга yozing.`,
+    `⏰ Ish vaqti: 09:00 — 23:00`,
     { parse_mode: 'Markdown' }
   );
 });
 
 // ─── ADMIN PANEL ─────────────────────────────────────────────────────────────
 bot.command('admin', async (ctx) => {
-  const isAdmin = await db.isAdmin(ctx.from.id);
-  if (!isAdmin) return ctx.reply('⛔ Ruxsat yo\'q');
+  if (!(await db.isAdmin(ctx.from.id))) return ctx.reply('⛔ Ruxsat yo\'q');
   await adminPanel.showPanel(ctx, bot);
 });
 
 adminPanel.register(bot, db);
 
-// ─── LAUNCH ──────────────────────────────────────────────────────────────────
-bot.launch().then(() => {
-  console.log('🚀 Mines Signal Bot ishga tushdi!');
-});
+// ─── RENDER WEBHOOK SERVER ───────────────────────────────────────────────────
+const app = express();
+app.use(express.json());
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+const PORT = process.env.PORT || 3000;
+const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN; // e.g. https://your-app.onrender.com
+const SECRET_PATH = `/webhook/${process.env.BOT_TOKEN}`;
+
+if (WEBHOOK_DOMAIN) {
+  // Production: webhook mode (Render)
+  app.use(bot.webhookCallback(SECRET_PATH));
+
+  app.get('/', (req, res) => res.send('🎰 Mines Signal Bot is running!'));
+
+  app.listen(PORT, async () => {
+    console.log(`🚀 Server started on port ${PORT}`);
+    await bot.telegram.setWebhook(`${WEBHOOK_DOMAIN}${SECRET_PATH}`);
+    console.log(`✅ Webhook set: ${WEBHOOK_DOMAIN}${SECRET_PATH}`);
+  });
+} else {
+  // Development: long polling mode
+  app.get('/', (req, res) => res.send('🎰 Mines Signal Bot is running (polling)!'));
+  app.listen(PORT, () => console.log(`🌐 Health check server on port ${PORT}`));
+
+  bot.launch().then(() => console.log('🚀 Bot polling rejimida ishlamoqda'));
+  process.once('SIGINT', () => bot.stop('SIGINT'));
+  process.once('SIGTERM', () => bot.stop('SIGTERM'));
+}
