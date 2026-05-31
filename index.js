@@ -9,7 +9,7 @@ const adminPanel = require('./admin');
 const bot = new Telegraf(process.env.BOT_TOKEN);
 bot.use(session());
 
-// ─── START ───────────────────────────────────────────────────────────────────
+// ─── START ────────────────────────────────────────────────────────────[...]
 bot.start(async (ctx) => {
   const user = ctx.from;
   await db.saveUser({
@@ -34,14 +34,14 @@ bot.start(async (ctx) => {
       parse_mode: 'Markdown',
       ...Markup.keyboard([
         ['🎯 Signal olish', '💳 Obuna sotib olish'],
-        ['👤 Mening profilim', '📊 Statistika'],
-        ['ℹ️ Yordam', '📞 Bog\'lanish'],
+        ['👤 Mening profilim', 'ℹ️ Yordam'],
+        ['📞 Bog\'lanish'],
       ]).resize(),
     }
   );
 });
 
-// ─── SIGNAL ──────────────────────────────────────────────────────────────────
+// ─── SIGNAL ────────────────────────────────────────────────────────────[...]
 bot.hears('🎯 Signal olish', async (ctx) => {
   const userId = ctx.from.id;
   const sub = await getSubscription(userId);
@@ -186,7 +186,7 @@ function buildSignalDisplay(signal) {
   return display;
 }
 
-// ─── SUBSCRIPTION ─────────────────────────────────────────────────────────────
+// ─── SUBSCRIPTION ────────────────────────────────────────────────────────[...]
 bot.hears('💳 Obuna sotib olish', async (ctx) => {
   await showSubscriptionPlans(ctx);
 });
@@ -283,7 +283,7 @@ bot.action('cancel_payment', async (ctx) => {
   await ctx.deleteMessage();
 });
 
-// ─── RECEIPT PHOTO ────────────────────────────────────────────────────────────
+// ─── RECEIPT PHOTO ────────────────────────────────────────────────────────[...]
 bot.on('photo', async (ctx) => {
   ctx.session = ctx.session || {};
   if (!ctx.session.awaitingReceipt) return;
@@ -323,7 +323,7 @@ bot.on('photo', async (ctx) => {
   );
 });
 
-// ─── APPROVE / REJECT ─────────────────────────────────────────────────────────
+// ─── APPROVE / REJECT ───────────────────────────────────────────────────────[...]
 bot.action(/^approve_(.+)$/, async (ctx) => {
   if (!(await db.isAdmin(ctx.from.id))) return ctx.answerCbQuery('⛔ Ruxsat yo\'q');
   const paymentId = ctx.match[1];
@@ -374,7 +374,7 @@ bot.action(/^reject_(.+)$/, async (ctx) => {
   } catch (e) {}
 });
 
-// ─── PROFILE ─────────────────────────────────────────────────────────────────
+// ─── PROFILE ───────────────────────────────────────────────────────────[...]
 bot.hears('👤 Mening profilim', async (ctx) => {
   const userId = ctx.from.id;
   const sub = await getSubscription(userId);
@@ -390,7 +390,7 @@ bot.hears('👤 Mening profilim', async (ctx) => {
     `🆔 ID: \`${userId}\`\n` +
     `👤 Ism: ${ctx.from.first_name}\n` +
     `📧 Username: @${ctx.from.username || 'yo\'q'}\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `━━━━━━━━━━━━━��━━━━━━\n` +
     `💳 *OBUNA HOLATI*\n` +
     `${isActive
       ? `✅ Faol — ${sub.plan_name}\n📅 Qolgan: ${daysLeft} kun\n📆 Tugash: ${new Date(sub.expires_at).toLocaleDateString('uz-UZ')}`
@@ -400,19 +400,6 @@ bot.hears('👤 Mening profilim', async (ctx) => {
     `🎯 Jami signal: ${stats.total_signals}\n` +
     `📅 Bugungi: ${stats.today_signals}\n` +
     `📆 Ro'yxatdan: ${new Date(stats.joined_at).toLocaleDateString('uz-UZ')}`,
-    { parse_mode: 'Markdown' }
-  );
-});
-
-bot.hears('📊 Statistika', async (ctx) => {
-  const stats = await db.getGlobalStats();
-  await ctx.reply(
-    `📊 *BOT STATISTIKASI*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `👥 Foydalanuvchilar: ${stats.total_users}\n` +
-    `✅ Faol obunalar: ${stats.active_subs}\n` +
-    `🎯 Bugungi signallar: ${stats.today_signals}\n` +
-    `📡 Jami signallar: ${stats.total_signals}`,
     { parse_mode: 'Markdown' }
   );
 });
@@ -441,7 +428,7 @@ bot.hears('📞 Bog\'lanish', async (ctx) => {
   );
 });
 
-// ─── ADMIN PANEL ─────────────────────────────────────────────────────────────
+// ─── ADMIN PANEL ────────────────────────────────────────────────────────[...]
 bot.command('admin', async (ctx) => {
   if (!(await db.isAdmin(ctx.from.id))) return ctx.reply('⛔ Ruxsat yo\'q');
   await adminPanel.showPanel(ctx, bot);
